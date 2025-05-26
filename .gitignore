@@ -4,3 +4,5 @@ __pycache__/
 __pycache__
 restaurant_reservations.db/
 restaurant_reservations.db
+.env/
+.env
