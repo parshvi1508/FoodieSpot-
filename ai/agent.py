@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from .llm_client import LLMClient
 from .services import get_restaurants_ai, check_availability_ai, make_reservation_ai
 
+from .recommendation_service import RecommendationService
 load_dotenv()
 
 class RestaurantAgent:
@@ -188,9 +189,18 @@ class RestaurantAgent:
                     break
     
     def _classify_intent_enhanced(self, user_message):
-        """Enhanced intent classification with better detection"""
+        """Enhanced intent classification with recommendation detection"""
         message_lower = user_message.lower()
         context = self.booking_context
+        
+        # RECOMMENDATION INTENT (NEW)
+        recommendation_keywords = [
+            'recommend', 'suggest', 'similar', 'like', 'alternatives', 'options',
+            'what do you recommend', 'any suggestions', 'help me choose'
+        ]
+        
+        if any(keyword in message_lower for keyword in recommendation_keywords):
+            return 'recommendation_request'
         
         # RESTAURANT DISCOVERY INTENT (Enhanced patterns)
         restaurant_discovery_keywords = [
@@ -232,9 +242,11 @@ class RestaurantAgent:
         return 'general_conversation'
     
     def _handle_intent(self, intent, user_message):
-        """Handle different intents"""
+        """Handle different intents including recommendations"""
         
-        if intent == 'show_restaurants':
+        if intent == 'recommendation_request':
+            return self._handle_recommendation_request(user_message)
+        elif intent == 'show_restaurants':
             return self._show_restaurants(user_message)
         elif intent == 'booking_request':
             return self._handle_booking_request(user_message)
@@ -248,6 +260,37 @@ class RestaurantAgent:
             return self._handle_confirmation(user_message)
         else:
             return self._handle_general_conversation(user_message)
+    
+    def _handle_recommendation_request(self, user_message):
+        """Handle recommendation requests using the recommendation engine"""
+        try:
+            print("[DEBUG] Processing recommendation request")
+            
+            # Get recommendations
+            recommendations_data = RecommendationService.get_recommendations_for_user(
+                user_message, 
+                self.booking_context
+            )
+            
+            # Format for display
+            response = RecommendationService.format_recommendations_for_display(recommendations_data)
+            
+            # Update context with any extracted preferences
+            preferences = recommendations_data['user_preferences']
+            if preferences.get('cuisine'):
+                self.booking_context['cuisine_preference'] = preferences['cuisine']
+            if preferences.get('party_size'):
+                self.booking_context['party_size'] = preferences['party_size']
+            if preferences.get('date'):
+                self.booking_context['date'] = preferences['date']
+            if preferences.get('time'):
+                self.booking_context['time'] = preferences['time']
+            
+            return response
+            
+        except Exception as e:
+            print(f"[DEBUG] Error handling recommendation request: {e}")
+            return "I'd be happy to recommend restaurants! Tell me what type of cuisine you're looking for or any other preferences."
     
     def _show_restaurants(self, user_message):
         """Show restaurants with real-time availability"""
